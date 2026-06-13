@@ -11,7 +11,7 @@ $excludeWorstResults = 1                 # 0 = alle zählen, 1 = schlechtestes r
 $CategoryCol         = "WertKlasse"      # Kategorie-Spalte im CSV
 
 # ------------------------------------------------------------
-# CSV-Dateien einlesen
+# CSV-Dateien einlesen (mit korrektem Encoding!)
 # ------------------------------------------------------------
 $files = Get-ChildItem -Path $inputFolder -Filter *.csv
 
@@ -19,12 +19,12 @@ $files = Get-ChildItem -Path $inputFolder -Filter *.csv
 $categories = @{}
 
 foreach ($file in $files) {
-    $csv = Import-Csv $file.FullName -Delimiter ';'
+    $csv = Import-Csv $file.FullName -Delimiter ';' -Encoding Default
 
     foreach ($row in $csv) {
         $gruppe    = $row.Gruppenname
         $kategorie = $row.$CategoryCol
-        $gesamt    = $row.Gesamt   # als String, wir rechnen später sauber
+        $gesamt    = $row.Gesamt
 
         if (-not $categories.ContainsKey($kategorie)) {
             $categories[$kategorie] = @{}
@@ -53,8 +53,8 @@ function New-GroupResultObject {
 
     # Reihenfolge: Gruppenname → Gesamt-Ergebnis → Ergebnisse
     $obj = [ordered]@{
-        Gruppenname      = $GroupData.Gruppenname
-        "Gesamt-Ergebnis"  = 0
+        Gruppenname       = $GroupData.Gruppenname
+        "Gesamt-Ergebnis" = 0
     }
 
     $values = @()
@@ -78,6 +78,7 @@ function New-GroupResultObject {
     # schlechteste 0/1/2 Ergebnisse ausschließen
     if ($values.Count -gt 0) {
         $n = [Math]::Min($excludeWorstResults, $values.Count - 1)
+
         if ($n -gt 0) {
             $sorted = $values | Sort-Object
             $use    = $sorted[$n..($sorted.Count - 1)]
@@ -138,24 +139,34 @@ foreach ($kategorie in $categories.Keys) {
 }
 
 # ------------------------------------------------------------
-# Schlechteste Ergebnisse in Excel gelb markieren
+# Excel-Nachbearbeitung: Headlines fett, schlechteste gelb, 2 Nachkommastellen
 # ------------------------------------------------------------
 $excel = Open-ExcelPackage -Path $outputFile
 
 foreach ($ws in $excel.Workbook.Worksheets) {
 
+    # Headlines fett
+    $headerRange = $ws.Cells[1,1,1,$ws.Dimension.End.Column]
+    $headerRange.Style.Font.Bold = $true
+
     # Ergebnis-Spalten finden
     $ergebnisCols = @()
     for ($col = 1; $col -le $ws.Dimension.End.Column; $col++) {
-        $title = $ws.Cells[1, $col].Text
-        if ($title -like "Ergebnis*") {
+        if ($ws.Cells[1, $col].Text -like "Ergebnis*") {
             $ergebnisCols += $col
         }
     }
 
-    if ($ergebnisCols.Count -eq 0) { continue }
+    # Gesamt-Ergebnis ist Spalte 2
+    $sumCol = 2
 
-    # Jede Zeile bearbeiten
+    # Format auf 2 Nachkommastellen
+    foreach ($col in $ergebnisCols) {
+        $ws.Cells[2, $col, $ws.Dimension.End.Row, $col].Style.Numberformat.Format = "0.00"
+    }
+    $ws.Cells[2, $sumCol, $ws.Dimension.End.Row, $sumCol].Style.Numberformat.Format = "0.00"
+
+    # schlechteste Ergebnisse gelb markieren
     for ($row = 2; $row -le $ws.Dimension.End.Row; $row++) {
 
         $values = @()
