@@ -5,9 +5,9 @@ $basePath            = Get-Location
 $inputFolder         = Join-Path $basePath "fdisk_export"
 $outputFile          = Join-Path $basePath "Top3_je_Kategorie.xlsx"
 
-$MinBewerbe          = 4                  # Mindestanzahl an Bewerben pro Kategorie
+$MinBewerbe          = 2                  # Mindestanzahl an Bewerben pro Kategorie
 $filterTopGroups     = 0                  # Anzahl der Top-Gruppen pro Kategorie (0 = alle)
-$excludeWorstResults = 1                  # 0 = alle zählen, 1 = schlechtestes raus, 2 = zwei schlechteste raus
+$excludeWorstResults = 0                  # 0 = alle zählen, 1 = schlechtestes raus, 2 = zwei schlechteste raus
 $CategoryCol         = "WertKlasse"       # Kategorie-Spalte im CSV
 
 # ------------------------------------------------------------
@@ -132,79 +132,86 @@ foreach ($kategorie in $categories.Keys) {
 # ------------------------------------------------------------
 # Excel-Nachbearbeitung
 # ------------------------------------------------------------
-$excel = Open-ExcelPackage -Path $outputFile
+if (Test-Path $outputFile) {
+        
+    $excel = Open-ExcelPackage -Path $outputFile
 
-foreach ($ws in $excel.Workbook.Worksheets) {
+    foreach ($ws in $excel.Workbook.Worksheets) {
 
-    # Headlines fett
-    $ws.Cells[1,1,1,$ws.Dimension.End.Column].Style.Font.Bold = $true
+        # Headlines fett
+        $ws.Cells[1,1,1,$ws.Dimension.End.Column].Style.Font.Bold = $true
 
-    # Ergebnis-Spalten finden
-    $ergebnisCols = @()
-    for ($col = 1; $col -le $ws.Dimension.End.Column; $col++) {
-        if ($ws.Cells[1, $col].Text -like "Ergebnis*") {
-            $ergebnisCols += $col
+        # Ergebnis-Spalten finden
+        $ergebnisCols = @()
+        for ($col = 1; $col -le $ws.Dimension.End.Column; $col++) {
+            if ($ws.Cells[1, $col].Text -like "Ergebnis*") {
+                $ergebnisCols += $col
+            }
         }
-    }
 
-    if ($ergebnisCols.Count -eq 0) { continue }
+        if ($ergebnisCols.Count -eq 0) { continue }
 
-    # Spaltenpositionen
-    $sumCol     = 2
-    $formulaCol = 3
+        # Spaltenpositionen
+        $sumCol     = 2
+        $formulaCol = 3
 
-    # Format auf 2 Nachkommastellen
-    foreach ($col in $ergebnisCols) {
-        $ws.Cells[2, $col, $ws.Dimension.End.Row, $col].Style.Numberformat.Format = "0.00"
-    }
-    $ws.Cells[2, $sumCol,     $ws.Dimension.End.Row, $sumCol].Style.Numberformat.Format     = "0.00"
-    $ws.Cells[2, $formulaCol, $ws.Dimension.End.Row, $formulaCol].Style.Numberformat.Format = "0.00"
-
-    # schlechteste Ergebnisse gelb markieren + Excel-Formel setzen
-    for ($row = 2; $row -le $ws.Dimension.End.Row; $row++) {
-
-        $values = @()
+        # Format auf 2 Nachkommastellen
         foreach ($col in $ergebnisCols) {
-            $cell = $ws.Cells[$row, $col]
-            if ($cell.Value -ne $null -and $cell.Value -ne "") {
-                $values += [PSCustomObject]@{
-                    Col = $col
-                    Val = [decimal]($cell.Value.ToString() -replace ',', '.')
+            $ws.Cells[2, $col, $ws.Dimension.End.Row, $col].Style.Numberformat.Format = "0.00"
+        }
+        $ws.Cells[2, $sumCol,     $ws.Dimension.End.Row, $sumCol].Style.Numberformat.Format     = "0.00"
+        $ws.Cells[2, $formulaCol, $ws.Dimension.End.Row, $formulaCol].Style.Numberformat.Format = "0.00"
+
+        # schlechteste Ergebnisse gelb markieren + Excel-Formel setzen
+        for ($row = 2; $row -le $ws.Dimension.End.Row; $row++) {
+
+            $values = @()
+            foreach ($col in $ergebnisCols) {
+                $cell = $ws.Cells[$row, $col]
+                if ($cell.Value -ne $null -and $cell.Value -ne "") {
+                    $values += [PSCustomObject]@{
+                        Col = $col
+                        Val = [decimal]($cell.Value.ToString() -replace ',', '.')
+                    }
                 }
             }
-        }
 
-        if ($values.Count -eq 0) { continue }
+            if ($values.Count -eq 0) { continue }
 
-        $n = [Math]::Min($excludeWorstResults, $values.Count - 1)
-        $excluded = $values | Sort-Object Val | Select-Object -First $n
+            $n = [Math]::Min($excludeWorstResults, $values.Count - 1)
+            $excluded = $values | Sort-Object Val | Select-Object -First $n
 
-        foreach ($item in $excluded) {
-            $ws.Cells[$row, $item.Col].Style.Fill.PatternType = "Solid"
-            $ws.Cells[$row, $item.Col].Style.Fill.BackgroundColor.SetColor([System.Drawing.Color]::Yellow)
-        }
+            foreach ($item in $excluded) {
+                $ws.Cells[$row, $item.Col].Style.Fill.PatternType = "Solid"
+                $ws.Cells[$row, $item.Col].Style.Fill.BackgroundColor.SetColor([System.Drawing.Color]::Yellow)
+            }
 
-        # Excel-Formel für Gesamt-Ergebnis-auto-berechnet-Formel setzen
-        $includeCells = @()
-        foreach ($col in $ergebnisCols) {
-            if ($excluded.Col -notcontains $col) {
-                $includeCells += $ws.Cells[$row, $col].Address
+            # Excel-Formel für Gesamt-Ergebnis-auto-berechnet-Formel setzen
+            $includeCells = @()
+            foreach ($col in $ergebnisCols) {
+                if ($excluded.Col -notcontains $col) {
+                    $includeCells += $ws.Cells[$row, $col].Address
+                }
+            }
+
+            if ($includeCells.Count -gt 0) {
+                $formula = "=SUM(" + ($includeCells -join ",") + ")"
+                $ws.Cells[$row, $formulaCol].Formula = $formula
             }
         }
 
-        if ($includeCells.Count -gt 0) {
-            $formula = "=SUM(" + ($includeCells -join ",") + ")"
-            $ws.Cells[$row, $formulaCol].Formula = $formula
-        }
+        # --------------------------------------------------------
+        # Spalte "Gesamt-Ergebnis-auto-berechnet" entfernen
+        # --------------------------------------------------------
+        $ws.DeleteColumn(2)
     }
 
-    # --------------------------------------------------------
-    # Spalte "Gesamt-Ergebnis-auto-berechnet" entfernen
-    # --------------------------------------------------------
-    $ws.DeleteColumn(2)
+    Close-ExcelPackage $excel
+
+    Write-Host "Fertig! Excel wurde erstellt: $outputFile"
+}
+else {
+    Write-Host "Keine Excel-Datei geschrieben!!"
 }
 
-Close-ExcelPackage $excel
-
-Write-Host "Fertig! Excel wurde erstellt: $outputFile"
 Write-Host ""
