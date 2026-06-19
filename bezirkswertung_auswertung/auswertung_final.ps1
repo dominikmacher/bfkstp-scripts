@@ -3,7 +3,7 @@
 # ------------------------------------------------------------
 $basePath            = Get-Location
 $inputFolder         = Join-Path $basePath "fdisk_export"
-$outputFile          = Join-Path $basePath "Top3_je_Kategorie.xlsx"
+$outputFile          = Join-Path $basePath "Auswertung_je_Kategorie.xlsx"
 
 $MinBewerbe          = 2                  # Mindestanzahl an Bewerben pro Kategorie
 $filterTopGroups     = 0                  # Anzahl der Top-Gruppen pro Kategorie (0 = alle)
@@ -124,7 +124,10 @@ foreach ($kategorie in $categories.Keys) {
         $results = $results | Select-Object -First $filterTopGroups
     }
 
-    $sheetName = ($kategorie -replace '[^\w\s-]', '').Substring(0, [Math]::Min(28, $kategorie.Length))
+    $sheetName = ($kategorie -replace '[^\w\s-]', '')
+    $sheetName = $sheetName.Replace('mit', 'm.')
+    $sheetName = $sheetName.Replace('ohne', 'o.')
+    $sheetName = $sheetName.Substring(0, [Math]::Min(30, $sheetName.Length))
 
     $results | Export-Excel -Path $outputFile -WorksheetName $sheetName -AutoSize -Append
 }
