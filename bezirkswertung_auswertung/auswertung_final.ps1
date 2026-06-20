@@ -5,9 +5,9 @@ $basePath            = Get-Location
 $inputFolder         = Join-Path $basePath "fdisk_export"
 $outputFile          = Join-Path $basePath "Auswertung_je_Kategorie.xlsx"
 
-$MinBewerbe          = 2                  # Mindestanzahl an Bewerben pro Kategorie
+$MinBewerbe          = 3                  # Mindestanzahl an Bewerben pro Kategorie
 $filterTopGroups     = 0                  # Anzahl der Top-Gruppen pro Kategorie (0 = alle)
-$excludeWorstResults = 0                  # 0 = alle zählen, 1 = schlechtestes raus, 2 = zwei schlechteste raus
+$excludeWorstResults = 1                  # 0 = alle zählen, 1 = schlechtestes raus, 2 = zwei schlechteste raus
 $CategoryCol         = "WertKlasse"       # Kategorie-Spalte im CSV
 
 # ------------------------------------------------------------
