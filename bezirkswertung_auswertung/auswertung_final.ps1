@@ -60,30 +60,29 @@ function New-GroupResultObject {
 
     foreach ($file in $Files) {
         $colName = "Ergebnis $($file.Name)"
-        $value   = $null
 
         if ($GroupData.Bewerbe.ContainsKey($file.Name)) {
             $raw = $GroupData.Bewerbe[$file.Name]
             if ($raw -ne $null -and $raw -ne "") {
                 $value = [decimal]($raw -replace ',', '.')
-                $values += $value
+            } else {
+                $value = 0
             }
+        } else {
+            $value = 0
         }
 
         $obj[$colName] = $value
+        $values += $value
     }
 
     # schlechteste 0/1/2 Ergebnisse ausschließen (für Code-Summe)
     if ($values.Count -gt 0) {
         $n = [Math]::Min($excludeWorstResults, $values.Count - 1)
 
-        if ($n -gt 0) {
-            $sorted = $values | Sort-Object
-            $use    = $sorted[$n..($sorted.Count - 1)]
-            $sum    = ($use | Measure-Object -Sum).Sum
-        } else {
-            $sum = ($values | Measure-Object -Sum).Sum
-        }
+        $sorted = $values | Sort-Object
+        $use    = $sorted[$n..($sorted.Count - 1)]
+        $sum    = ($use | Measure-Object -Sum).Sum
     } else {
         $sum = 0
     }
@@ -170,12 +169,17 @@ if (Test-Path $outputFile) {
 
             $values = @()
             foreach ($col in $ergebnisCols) {
-                $cell = $ws.Cells[$row, $col]
-                if ($cell.Value -ne $null -and $cell.Value -ne "") {
-                    $values += [PSCustomObject]@{
-                        Col = $col
-                        Val = [decimal]($cell.Value.ToString() -replace ',', '.')
-                    }
+                $raw = $ws.Cells[$row, $col].Value
+
+                if ($raw -eq $null -or $raw.ToString().Trim() -eq "") {
+                    $num = 0
+                } else {
+                    $num = [decimal]($raw.ToString().Trim() -replace ',', '.')
+                }
+
+                $values += [PSCustomObject]@{
+                    Col = $col
+                    Val = $num
                 }
             }
 
@@ -191,9 +195,9 @@ if (Test-Path $outputFile) {
 
             # Excel-Formel für Gesamt-Ergebnis-auto-berechnet-Formel setzen
             $includeCells = @()
-            foreach ($col in $ergebnisCols) {
-                if ($excluded.Col -notcontains $col) {
-                    $includeCells += $ws.Cells[$row, $col].Address
+            foreach ($v in $values) {
+                if ($excluded.Col -notcontains $v.Col) {
+                    $includeCells += $ws.Cells[$row, $v.Col].Address
                 }
             }
 
