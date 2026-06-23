@@ -20,6 +20,12 @@ foreach ($file in $files) {
     $csv = Import-Csv $file.FullName -Delimiter ';' -Encoding Default
 
     foreach ($row in $csv) {
+
+        # Bewerbsgruppen mit WertGrp "verschiedene" ignorieren
+        if ($row.WertGrp -match "(?i)verschiedene") {
+            continue
+        }
+
         $gruppe    = $row.Gruppenname
         $kategorie = $row.$CategoryCol
         $gesamt    = $row.Gesamt
@@ -210,7 +216,25 @@ if (Test-Path $outputFile) {
         # --------------------------------------------------------
         # Spalte "Gesamt-Ergebnis-auto-berechnet" entfernen
         # --------------------------------------------------------
-        $ws.DeleteColumn(2)
+        #$ws.DeleteColumn(2)
+
+
+        # --------------------------------------------------------
+        # Spalte "Gesamt-Ergebnis-auto-berechnet" in Rang-Spalte umwandeln
+        # --------------------------------------------------------
+        $ws.Cells[1,2].Value = "Rang"
+        $ws.Cells[1,2].Style.Font.Bold = $true
+        
+        # Auto-Breite für Rang-Spalte
+        $ws.Column(2).AutoFit()
+
+        # Rang aufsteigend setzen
+        $rank = 1
+        for ($row = 2; $row -le $ws.Dimension.End.Row; $row++) {
+            $ws.Cells[$row,2].Value = $rank
+            $ws.Cells[$row, 2].Style.Numberformat.Format = "0"
+            $rank++
+        }
     }
 
     Close-ExcelPackage $excel
