@@ -45,6 +45,54 @@ foreach ($file in $files) {
     }
 }
 
+
+# ------------------------------------------------------------
+# LOG-Datei erzeugen
+# ------------------------------------------------------------
+$logFile = Join-Path $basePath "Auswertung_LOG.txt"
+if (Test-Path $logFile) { Remove-Item $logFile }
+
+# Alle Gruppen sammeln
+$allGroups = @()
+
+foreach ($kategorie in $categories.Keys) {
+    foreach ($gruppe in $categories[$kategorie].Keys) {
+
+        $bewerbeCount = $categories[$kategorie][$gruppe].Bewerbe.Count
+        $isRelevant   = ($bewerbeCount -ge $MinBewerbe)
+
+        $entry = [PSCustomObject]@{
+            Gruppenname = $gruppe
+            Kategorie   = $kategorie
+            Bewerbe     = $bewerbeCount
+            Relevant    = $isRelevant
+        }
+
+        $allGroups += $entry
+    }
+}
+
+# Alphabetisch sortieren
+$allGroups = $allGroups | Sort-Object Gruppenname
+
+# LOG schreiben
+foreach ($g in $allGroups) {
+
+    if ($g.Relevant) {
+        $line = "{0} ({1}) - OK ({2} Bewerbe)" -f $g.Gruppenname, $g.Kategorie, $g.Bewerbe
+    } else {
+        $line = "{0} ({1}) - zu wenig Bewerbsteilnahmen ({2} Bewerbe)" -f $g.Gruppenname, $g.Kategorie, $g.Bewerbe
+    }
+
+    Add-Content -Path $logFile -Value $line
+}
+
+Write-Host "LOG geschrieben: $logFile"
+
+
+
+
+
 # ------------------------------------------------------------
 # Hilfsfunktion: Ergebnisobjekt erzeugen
 # ------------------------------------------------------------
