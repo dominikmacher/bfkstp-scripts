@@ -7,25 +7,6 @@
     (WertGrp enthält "verschiedene"), berechnet die Ergebnisse je Bewerbsgruppe und Kategorie,
     erstellt eine Excel‑Auswertung und erzeugt eine LOG‑Datei.
 
-    Funktionen:
-    - CSV‑Einlesen und Gruppierung nach Kategorie
-    - fehlende Ergebnisse werden als 0 gewertet
-    - schlechteste Ergebnisse werden ausgeschlossen (konfigurierbar)
-    - Excel‑Auswertung mit Rang, Formeln und Markierungen
-    - LOG‑Datei mit alphabetischer Liste aller Gruppen und Status ("OK" / "zu wenig Bewerbsteilnahmen")
-
-.PARAMETER MinBewerbe
-    Mindestanzahl an Bewerben, damit eine Gruppe gewertet wird.
-
-.PARAMETER filterTopGroups
-    Anzahl der Top‑Gruppen pro Kategorie (0 = alle).
-
-.PARAMETER excludeWorstResults
-    Anzahl der auszuschließenden schlechtesten Ergebnisse.
-
-.PARAMETER CategoryCol
-    CSV‑Spalte, die die Kategorie definiert (z. B. "WertKlasse").
-
 .INPUTS
     CSV‑Dateien im FDISK‑Format.
 
@@ -40,7 +21,6 @@
 .NOTES
     Benötigt das PowerShell‑Modul "ImportExcel".
 #>
-
 
 
 
@@ -100,42 +80,76 @@ foreach ($file in $files) {
 $logFile = Join-Path $basePath "Auswertung_LOG.txt"
 if (Test-Path $logFile) { Remove-Item $logFile }
 
-# Alle Gruppen sammeln
-$allGroups = @()
-
-foreach ($kategorie in $categories.Keys) {
-    foreach ($gruppe in $categories[$kategorie].Keys) {
-
-        $bewerbeCount = $categories[$kategorie][$gruppe].Bewerbe.Count
-        $isRelevant   = ($bewerbeCount -ge $MinBewerbe)
-
-        $entry = [PSCustomObject]@{
-            Gruppenname = $gruppe
-            Kategorie   = $kategorie
-            Bewerbe     = $bewerbeCount
-            Relevant    = $isRelevant
+# Alle Gruppen für LOG flach aufbereiten
+$groups = foreach ($kategorie in $categories.Keys) {
+    foreach ($g in $categories[$kategorie].Values) {
+        [PSCustomObject]@{
+            Gruppenname = $g.Gruppenname
+            WertKlasse  = $kategorie
+            Count       = $g.Bewerbe.Count
         }
-
-        $allGroups += $entry
     }
 }
 
-# Alphabetisch sortieren
-$allGroups = $allGroups | Sort-Object Gruppenname
+# --- LOG-Datei generieren ---
+$logContent = ""
 
-# LOG schreiben
-foreach ($g in $allGroups) {
-
-    if ($g.Relevant) {
-        $line = "{0} ({1}) - OK ({2} Bewerbe)" -f $g.Gruppenname, $g.Kategorie, $g.Bewerbe
+foreach ($grp in ($groups | Sort-Object Gruppenname)) {
+    $count = $grp.Count
+    if ($count -ge $MinBewerbe) {
+        $statusText = "OK ($count Bewerbe)"
     } else {
-        $line = "{0} ({1}) - zu wenig Bewerbsteilnahmen ({2} Bewerbe)" -f $g.Gruppenname, $g.Kategorie, $g.Bewerbe
+        $statusText = "zu wenig Bewerbsteilnahmen ($count Bewerbe)"
     }
-
-    Add-Content -Path $logFile -Value $line
+    $logContent += "$($grp.Gruppenname) ($($grp.WertKlasse)) - $statusText`n"
 }
 
+# --- Probleme kompakt ---
+$logContent += "`n----------------------------------------"
+$logContent += "`nProbleme:`n"
+
+$allNames = $groups | Select-Object -ExpandProperty Gruppenname
+$regex    = '^(?<base>.+?)\s*(?<num>\d+)?$'
+
+# Gruppieren nach Basisname
+$grouped = $allNames | ForEach-Object {
+    if ($_ -match $regex) {
+        [PSCustomObject]@{
+            Full = $_
+            Base = $Matches.base.Trim()
+            Num  = $Matches.num
+        }
+    }
+} | Group-Object Base
+
+$found = $false
+
+foreach ($g in $grouped) {
+
+    # Nummerierte und nicht nummerierte Gruppen trennen
+    $withNum  = $g.Group | Where-Object { $_.Num } | Select-Object -ExpandProperty Full -Unique
+    $noNum    = $g.Group | Where-Object { -not $_.Num } | Select-Object -ExpandProperty Full -Unique
+
+    # Nur wenn beides existiert → Problem
+    if ($withNum.Count -gt 0 -and $noNum.Count -gt 0) {
+
+        # Kompakte Ausgabe
+        $left  = ($noNum -join ", ")
+        $right = ($withNum -join ", ")
+
+        $logContent += "$left  <-->  $right`n"
+        $found = $true
+    }
+}
+
+if (-not $found) {
+    $logContent += "Keine Probleme gefunden.`n"
+}
+
+
+Set-Content -Path $logFile -Value $logContent -Encoding UTF8
 Write-Host "LOG geschrieben: $logFile"
+
 
 
 
