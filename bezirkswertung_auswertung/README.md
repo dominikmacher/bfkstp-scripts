@@ -1,4 +1,3 @@
-````markdown
 # 🏆 FDISK Bezirkswertung
 
 PowerShell-Skript zur automatischen Erstellung einer **Bezirkswertung** aus FDISK‑CSV-Dateien.
