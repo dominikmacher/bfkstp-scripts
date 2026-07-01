@@ -1,3 +1,51 @@
+<#
+.SYNOPSIS
+    Erstellt eine Bezirkswertung aus mehreren FDISK‑CSV‑Dateien (Ergebnislisten der Abschnittsbewerbe).
+
+.DESCRIPTION
+    Liest alle CSV‑Dateien aus dem Ordner "fdisk_export" ein, filtert ungültige Gruppen
+    (WertGrp enthält "verschiedene"), berechnet die Ergebnisse je Bewerbsgruppe und Kategorie,
+    erstellt eine Excel‑Auswertung und erzeugt eine LOG‑Datei.
+
+    Funktionen:
+    - CSV‑Einlesen und Gruppierung nach Kategorie
+    - fehlende Ergebnisse werden als 0 gewertet
+    - schlechteste Ergebnisse werden ausgeschlossen (konfigurierbar)
+    - Excel‑Auswertung mit Rang, Formeln und Markierungen
+    - LOG‑Datei mit alphabetischer Liste aller Gruppen und Status ("OK" / "zu wenig Bewerbsteilnahmen")
+
+.PARAMETER MinBewerbe
+    Mindestanzahl an Bewerben, damit eine Gruppe gewertet wird.
+
+.PARAMETER filterTopGroups
+    Anzahl der Top‑Gruppen pro Kategorie (0 = alle).
+
+.PARAMETER excludeWorstResults
+    Anzahl der auszuschließenden schlechtesten Ergebnisse.
+
+.PARAMETER CategoryCol
+    CSV‑Spalte, die die Kategorie definiert (z. B. "WertKlasse").
+
+.INPUTS
+    CSV‑Dateien im FDISK‑Format.
+
+.OUTPUTS
+    - Auswertung_je_Kategorie.xlsx
+    - Auswertung_LOG.txt
+
+.EXAMPLE
+    PS C:\> .\auswertung_final.ps1
+    Führt die komplette Bezirkswertung durch.
+
+.NOTES
+    Benötigt das PowerShell‑Modul "ImportExcel".
+#>
+
+
+
+
+
+
 # ------------------------------------------------------------
 # KONFIGURATION
 # ------------------------------------------------------------
